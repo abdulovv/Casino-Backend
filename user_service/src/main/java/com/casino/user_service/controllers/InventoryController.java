@@ -20,7 +20,7 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping
-    public List<InventoryItemResponse> inventory(@AuthenticationPrincipal Jwt jwt) throws UserNotFoundException {
+    public List<InventoryItemResponse> getInventoryItems(@AuthenticationPrincipal Jwt jwt) throws UserNotFoundException {
         Long userId = Long.valueOf(jwt.getSubject());
         return inventoryService.findAllItemsByUserId(userId);
     }

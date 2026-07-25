@@ -2,6 +2,8 @@
   <dictionary name="project">
     <words>
       <w>bigserial</w>
+      <w>gamecase</w>
+      <w>resourceserver</w>
     </words>
   </dictionary>
 </component>

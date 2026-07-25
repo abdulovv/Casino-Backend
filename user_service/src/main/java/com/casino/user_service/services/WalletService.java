@@ -14,9 +14,9 @@ import java.util.Optional;
 public class WalletService {
     private final WalletRepository walletRepository;
 
-    public WalletResponse getWalletByUserId(Long id) throws WalletNotFoundException {
+    public WalletResponse findWalletByUserId(Long id) throws WalletNotFoundException {
         Optional<Wallet> walletOptional = walletRepository.findByUserId(id);
         Wallet wallet = walletOptional.orElseThrow(()-> new WalletNotFoundException(id));
-        return new WalletResponse(wallet.getId(), wallet.getBalance());
+        return WalletResponse.mapToResponse(wallet);
     }
 }

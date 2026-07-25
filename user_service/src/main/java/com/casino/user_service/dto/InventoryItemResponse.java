@@ -21,4 +21,11 @@ public record InventoryItemResponse(
         }
         return finalInventoryItemResponse;
     }
+
+    public static InventoryItemResponse mapToInventoryItemResponse(InventoryItem inventoryItem){
+        return new InventoryItemResponse(
+                inventoryItem.getId(),
+                inventoryItem.getItemId()
+        );
+    }
 }

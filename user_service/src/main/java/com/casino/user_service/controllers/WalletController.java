@@ -17,8 +17,8 @@ public class WalletController {
     private final WalletService walletService;
 
     @GetMapping
-    public WalletResponse wallet(@AuthenticationPrincipal Jwt jwt) throws WalletNotFoundException {
+    public WalletResponse getWallet(@AuthenticationPrincipal Jwt jwt) throws WalletNotFoundException {
         Long userId = Long.valueOf(jwt.getSubject());
-        return walletService.getWalletByUserId(userId);
+        return walletService.findWalletByUserId(userId);
     }
 }

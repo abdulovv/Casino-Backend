@@ -1,5 +1,6 @@
 package com.casino.user_service.controllers;
 
+import com.casino.user_service.dto.UserResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,10 +14,7 @@ import java.util.Map;
 public class UserController {
 
     @GetMapping("/me")
-    public Map<String, Object> me(@AuthenticationPrincipal Jwt jwt) {
-        return Map.of(
-                "userId", Long.valueOf(jwt.getSubject()),
-                "email", jwt.getClaimAsString("email")
-        );
+    public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
+        return UserResponse.mapToResponse(jwt);
     }
 }

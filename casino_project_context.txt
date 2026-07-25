@@ -1,0 +1,658 @@
+ПРОЕКТ: PET CASINO BACKEND
+===========================
+
+1. ИДЕЯ ПРОЕКТА
+---------------
+
+Учебный backend-проект казино с вымышленной валютой — звёздами ⭐.
+
+Основные возможности:
+- регистрация и авторизация пользователей;
+- JWT-аутентификация;
+- кошелёк пользователя;
+- инвентарь пользователя;
+- кейсы с разными наборами наград и шансами выпадения;
+- открытие кейсов;
+- списание звёзд с кошелька;
+- добавление выпавшего предмета в инвентарь;
+- в будущем: upgrade, crash, gateway, Kafka, Redis, Docker и Kubernetes.
+
+Фронтенд планируется подключать после готовности основных backend API.
+
+
+2. ТЕХНОЛОГИИ
+-------------
+
+- Java 21+
+- Spring Boot 4.0.7
+- Spring Cloud 2025.1.2
+- Spring Security
+- OAuth2 Resource Server
+- JWT с RSA-ключами
+- Spring Data JPA
+- Hibernate
+- PostgreSQL
+- Flyway
+- Lombok
+- Maven
+- Docker / Docker Compose
+- В будущем: Redis, Kafka, Kubernetes
+
+
+3. АРХИТЕКТУРА
+--------------
+
+Проект — Maven multi-module и состоит из микросервисов:
+
+- gateway
+- user-service
+- cases-service
+- upgrade-service
+- crash-service
+
+На текущем этапе используются:
+
+- user-service — порт 8081
+- cases-service — порт 8082
+
+Сейчас сервисы используют одну PostgreSQL-базу casino, но каждый сервис логически владеет только своими таблицами.
+
+Важно:
+- user-service не должен работать напрямую с таблицами cases-service;
+- cases-service не должен работать напрямую с таблицами user-service;
+- между таблицами разных микросервисов не создаются внешние ключи;
+- взаимодействие между сервисами позже будет через HTTP API и/или Kafka;
+- у каждого сервиса своя таблица истории Flyway.
+
+
+4. USER-SERVICE: ЧТО УЖЕ СДЕЛАНО
+--------------------------------
+
+Реализована базовая цепочка:
+
+register
+→ login
+→ JWT
+→ защищённые endpoint
+→ данные пользователя
+→ кошелёк
+→ инвентарь
+
+4.1. Регистрация
+
+Endpoint:
+
+POST /api/auth/register
+
+При регистрации:
+- проверяется уникальность email;
+- пароль хэшируется BCrypt;
+- создаётся User;
+- сразу создаётся Wallet с балансом 0;
+- Wallet связывается с User через user_id.
+
+4.2. Авторизация
+
+Endpoint:
+
+POST /api/auth/login
+
+При успешном входе возвращается JWT.
+
+В JWT находятся claims:
+
+- sub — ID пользователя;
+- email — email пользователя;
+- iat — время создания;
+- exp — время окончания действия;
+- iss — user-service.
+
+Пример payload:
+
+{
+  "sub": "1",
+  "email": "abdulov.a@gmail.com"
+}
+
+jwt.getSubject() возвращает значение sub, то есть ID пользователя строкой.
+
+Пример:
+
+Long userId = Long.valueOf(jwt.getSubject());
+
+Пользователь не передаёт свой ID вручную. Сервер получает его из уже проверенного JWT.
+
+4.3. Spring Security
+
+Публичные endpoint:
+
+- /api/auth/register
+- /api/auth/login
+
+Остальные endpoint требуют Bearer Token.
+
+Приложение работает без HTTP-сессий:
+
+SessionCreationPolicy.STATELESS
+
+JWT проверяется с помощью публичного RSA-ключа.
+
+4.4. Текущий пользователь
+
+Endpoint:
+
+GET /api/users/me
+
+Пример ответа:
+
+{
+  "userId": 1,
+  "email": "abdulov.a@gmail.com"
+}
+
+4.5. Кошелёк
+
+Endpoint:
+
+GET /api/wallet
+
+Кошелёк ищется по user_id, который получен из JWT.
+
+Цепочка:
+
+WalletController
+→ получает Jwt
+→ достаёт userId
+→ вызывает WalletService
+→ WalletService вызывает WalletRepository
+→ Entity превращается в WalletResponse
+
+Пример ответа:
+
+{
+  "id": 1,
+  "balance": 0
+}
+
+Нельзя возвращать Entity напрямую, потому что в JSON могут попасть связанные сущности и даже хэш пароля.
+
+Используется DTO WalletResponse.
+
+4.6. Инвентарь
+
+Endpoint:
+
+GET /api/inventory
+
+Если инвентарь пустой, это не ошибка.
+
+Правильный ответ:
+
+HTTP 200 OK
+
+[]
+
+Текущая модель InventoryItem:
+
+- id — ID конкретного экземпляра предмета;
+- user — владелец;
+- itemId — ID общего Item из cases-service.
+
+Пример:
+
+InventoryItem:
+- id = 101
+- user_id = 1
+- item_id = 10
+
+Это означает:
+конкретный экземпляр предмета 101 принадлежит пользователю 1 и является предметом типа 10.
+
+InventoryItemResponse пока содержит:
+
+- inventoryItemId
+- itemId
+
+Позже user-service сможет получить название, картинку и цену предмета из cases-service.
+
+
+5. МОДЕЛЬ ПРЕДМЕТОВ
+-------------------
+
+Используется разделение между типом предмета и его конкретным экземпляром.
+
+5.1. Item
+
+Item — общее описание типа предмета.
+
+Например:
+
+Item:
+- id = 10
+- name = "Нож"
+- imageUrl = "..."
+- price = 500
+
+Все ножи этого типа имеют одинаковые:
+- название;
+- изображение;
+- цену;
+- базовые характеристики.
+
+5.2. InventoryItem
+
+InventoryItem — конкретный экземпляр предмета у конкретного игрока.
+
+Например:
+
+inventory_items:
+
+id  | user_id | item_id
+101 | 1       | 10
+102 | 2       | 10
+103 | 3       | 10
+
+Все три записи — одинаковый тип предмета "Нож", но это три разных экземпляра с разными ID и владельцами.
+
+Позже в InventoryItem можно добавить:
+- createdAt;
+- status;
+- locked;
+- sold;
+- upgraded;
+- дополнительные характеристики экземпляра.
+
+
+6. CASES-SERVICE: ТЕКУЩАЯ МОДЕЛЬ
+--------------------------------
+
+В cases-service созданы или запланированы Entity:
+
+6.1. Item
+
+Поля:
+
+- id
+- name
+- imageUrl
+- price
+
+Таблица:
+
+items
+
+6.2. GameCase
+
+Название GameCase выбрано, чтобы не путаться с ключевым словом Java case.
+
+Во всех Java-классах для основной сущности используется префикс GameCase:
+- GameCase
+- GameCaseResponse
+- GameCaseDetailsResponse
+- GameCaseService
+- GameCaseController
+- GameCaseRepository
+- GameCaseNotFoundException
+
+Endpoint остаётся /api/cases, потому что URL не является Java-кодом.
+
+Поля:
+
+- id
+- name
+- imageUrl
+- price
+- active
+
+Таблица:
+
+cases
+
+6.3. CaseItem
+
+CaseItem связывает:
+- конкретный кейс;
+- общий предмет Item;
+- вес выпадения.
+
+Поля:
+
+- id
+- gameCase
+- item
+- weight
+
+Таблица:
+
+case_items
+
+Пример:
+
+case_id | item_id | weight
+1       | 10      | 70
+1       | 11      | 30
+2       | 10      | 5
+2       | 15      | 95
+
+Это означает:
+- разные кейсы имеют разные наборы наград;
+- один Item может находиться в нескольких кейсах;
+- шанс одного Item может отличаться в разных кейсах;
+- weight — относительный вес, сумма не обязана быть равна 100.
+
+Связи:
+
+GameCase ← CaseItem → Item
+
+CaseItem — это не экземпляр предмета пользователя.
+Это настройка: какой Item находится в конкретном кейсе и с каким весом.
+
+
+7. БАЗА ДАННЫХ И FLYWAY
+-----------------------
+
+Используется одна база PostgreSQL:
+
+casino
+
+Логическое владение таблицами:
+
+user-service:
+- users
+- wallets
+- inventory_items
+
+cases-service:
+- items
+- cases
+- case_items
+
+Внешний ключ между inventory_items.item_id и items.id не создаётся, потому что таблицы принадлежат разным микросервисам.
+
+7.1. История Flyway
+
+Для user-service:
+
+flyway_schema_history_users
+
+Для cases-service:
+
+flyway_schema_history_cases
+
+Так миграции с одинаковыми версиями V1, V2 в разных сервисах не конфликтуют.
+
+В каждом application.yaml настроено:
+
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: отдельная_таблица_истории
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+
+baseline-version: 0 позволяет выполнить миграцию V1 после создания baseline.
+
+Hibernate настроен:
+
+ddl-auto: validate
+
+То есть Hibernate только проверяет таблицы. Создавать и менять их должен Flyway.
+
+
+8. APPLICATION.YAML
+-------------------
+
+user-service:
+
+- server.port: 8081
+- spring.application.name: user-service
+- PostgreSQL casino
+- отдельная Flyway history table
+- JWT private-key
+- JWT public-key
+- expiration: 15m
+
+cases-service:
+
+- server.port: 8082
+- spring.application.name: cases-service
+- PostgreSQL casino
+- отдельная Flyway history table
+- OAuth2 Resource Server
+- public-key-location: classpath:keys/public.pem
+
+В cases-service должен лежать публичный ключ:
+
+src/main/resources/keys/public.pem
+
+Приватный ключ должен оставаться только в user-service.
+
+
+9. ВАЖНЫЕ АРХИТЕКТУРНЫЕ ПРАВИЛА
+-------------------------------
+
+1. Controller отвечает за HTTP:
+   - получает запрос;
+   - получает JWT;
+   - достаёт userId;
+   - вызывает Service;
+   - возвращает DTO.
+
+2. Service отвечает за бизнес-логику:
+   - ищет данные;
+   - проверяет условия;
+   - изменяет сущности;
+   - выбрасывает исключения;
+   - превращает Entity в DTO.
+
+3. Repository отвечает за работу с БД.
+
+4. Entity нельзя возвращать напрямую из API.
+
+5. Для API используются DTO.
+
+6. Для внедрения зависимостей используется constructor injection.
+
+Пример:
+
+@Service
+@RequiredArgsConstructor
+public class WalletService {
+    private final WalletRepository walletRepository;
+}
+
+@Autowired не нужен, если у класса один конструктор.
+
+7. JPA Entity обычно имеют:
+
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor
+
+8. Не создавать двусторонние связи без необходимости.
+
+Например пока не добавлять List<CaseItem> внутрь GameCase и Item. CaseItemRepository может находить содержимое кейса по caseId.
+
+
+10. ЧТО НУЖНО СДЕЛАТЬ ДАЛЬШЕ
+----------------------------
+
+Текущая точка:
+создана модель cases-service и миграции. Следующий шаг — чтение кейсов.
+
+10.1. Репозитории cases-service
+
+Создать:
+
+ItemRepository extends JpaRepository<Item, Long>
+
+GameCaseRepository extends JpaRepository<GameCase, Long>
+
+Метод:
+
+List<GameCase> findAllByActiveTrue();
+
+CaseItemRepository extends JpaRepository<CaseItem, Long>
+
+Метод:
+
+List<CaseItem> findAllByGameCaseId(Long caseId);
+
+10.2. DTO cases-service
+
+Создать DTO для списка кейсов:
+
+GameCaseResponse:
+- id
+- name
+- imageUrl
+- price
+
+Создать DTO предмета кейса:
+
+CaseItemResponse:
+- itemId
+- name
+- imageUrl
+- price
+- weight
+
+Создать DTO подробного кейса:
+
+GameCaseDetailsResponse:
+- id
+- name
+- imageUrl
+- price
+- список наград
+
+10.3. GameCaseService
+
+Реализовать:
+
+- получить все активные кейсы;
+- получить один GameCase по ID;
+- получить содержимое кейса;
+- если кейс не найден — GameCaseNotFoundException.
+
+10.4. GameCaseController
+
+Сначала реализовать только чтение:
+
+GET /api/cases
+
+Возвращает список активных GameCase.
+
+GET /api/cases/{id}
+
+Возвращает GameCase и его возможные награды.
+
+Пока не делать открытие кейса.
+
+10.5. Тестовые данные
+
+Добавить отдельную Flyway-миграцию, например:
+
+V2__insert_test_cases.sql
+
+Добавить:
+- несколько Item;
+- несколько GameCase;
+- связи CaseItem с разными weight.
+
+10.6. Открытие кейса
+
+После проверки чтения реализовать:
+
+POST /api/cases/{id}/open
+
+Будущая цепочка:
+
+1. Получить userId из JWT.
+2. Найти GameCase.
+3. Проверить, что GameCase активен.
+4. Получить предметы кейса.
+5. Выбрать один предмет по weight.
+6. Проверить баланс пользователя.
+7. Списать цену кейса.
+8. Добавить InventoryItem пользователю.
+9. Вернуть выпавший предмет.
+
+Но cases-service не должен напрямую изменять таблицы user-service.
+
+Варианты взаимодействия:
+- HTTP-вызов в user-service;
+- позже Kafka-события.
+
+Для первой рабочей версии проще начать с HTTP API между сервисами.
+
+10.7. Внутренние endpoint user-service
+
+Позже понадобятся защищённые внутренние операции:
+
+- списать баланс;
+- начислить баланс;
+- добавить предмет в инвентарь.
+
+Нужно продумать защиту внутренних endpoint, чтобы обычный пользователь не мог вызвать их напрямую.
+
+10.8. После cases-service
+
+Следующий порядок:
+
+1. Завершить открытие кейсов.
+2. Настроить API Gateway.
+3. Добавить нормальную обработку ошибок через @RestControllerAdvice.
+4. Добавить валидацию DTO.
+5. Добавить тесты.
+6. Добавить Redis при реальной необходимости.
+7. Добавить Kafka для событий.
+8. Реализовать upgrade-service.
+9. Реализовать crash-service.
+10. Подключить frontend.
+11. Docker Compose для всех сервисов.
+12. Kubernetes.
+
+
+11. ЧТО ПРОВЕРЯТЬ В POSTMAN
+---------------------------
+
+user-service:
+
+POST /api/auth/register
+POST /api/auth/login
+GET /api/users/me
+GET /api/wallet
+GET /api/inventory
+
+Для защищённых endpoint:
+
+Authorization: Bearer <JWT>
+
+Проверки:
+
+- без JWT должен быть 401;
+- с неправильным JWT должен быть 401;
+- с правильным JWT данные должны принадлежать текущему пользователю;
+- пустой инвентарь должен возвращать 200 и [];
+- Entity и password не должны попадать в JSON.
+
+cases-service после реализации:
+
+GET /api/cases
+GET /api/cases/{id}
+
+Позже:
+
+POST /api/cases/{id}/open
+
+
+12. КРАТКИЙ ТЕКСТ ДЛЯ НОВОГО ЧАТА
+---------------------------------
+
+Можно отправить следующему ChatGPT:
+
+"Я делаю pet-проект casino backend на Java 21 и Spring Boot 4.0.7 в виде микросервисов. Есть user-service на 8081 и cases-service на 8082, PostgreSQL, Flyway, JPA, JWT RSA. В user-service уже работают регистрация, логин, JWT, GET /api/users/me, GET /api/wallet и GET /api/inventory. Wallet создаётся при регистрации. InventoryItem содержит id, User и itemId; name/image/price находятся в Item внутри cases-service. Пустой инвентарь возвращает 200 и []. В cases-service модель: Item(id,name,imageUrl,price), GameCase(id,name,imageUrl,price,active), CaseItem(id,gameCase,item,weight). Разные кейсы имеют разные награды через case_items. Одна PostgreSQL-база casino, но у каждого сервиса свои таблицы и своя Flyway history table; внешних ключей между сервисами нет. Сейчас нужно создать ItemRepository, GameCaseRepository, CaseItemRepository, DTO, GameCaseService и endpoint GET /api/cases и GET /api/cases/{id}. Объясняй мне код, потому что я учусь, и не выдавай слишком много за один раз."
