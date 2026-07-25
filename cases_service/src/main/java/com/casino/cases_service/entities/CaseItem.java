@@ -8,9 +8,7 @@ import lombok.Setter;
 @Entity
 @Table(
         name = "case_items",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"case_id", "item_id"})
-        }
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"case_id", "item_id"})}
 )
 @Getter
 @Setter

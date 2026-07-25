@@ -8,3 +8,8 @@ services:
       POSTGRES_PASSWORD: casino
     ports:
       - "5432:5432"
+    volumes:
+      - casino-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  casino-postgres-data:
