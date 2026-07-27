@@ -1,3 +1,36 @@
+server:
+  port: 8080
+
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
   application:
     name: gateway-service
+
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: user-service
+              uri: ${USER_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/auth/**,/api/users/**,/api/wallet/**,/api/inventory/**
+
+            - id: cases-service
+              uri: ${CASES_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/cases/**,/api/admin/cases/**
+
+            - id: item-service
+              uri: ${ITEM_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/items/**,/api/admin/items/**
+
+            - id: store-service
+              uri: ${STORE_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/store/**

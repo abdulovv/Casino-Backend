@@ -11,6 +11,8 @@
     <modules>
         <module>gateway_service</module>
         <module>user_service</module>
+        <module>item_service</module>
+        <module>store_service</module>
         <module>cases_service</module>
         <module>upgrader_service</module>
         <module>crash_service</module>

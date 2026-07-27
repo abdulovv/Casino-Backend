@@ -1,0 +1,143 @@
+.inventory-page {
+  display: grid;
+  gap: 34px;
+}
+
+.profile-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.profile-banner__avatar {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  font-size: 1.12rem;
+  font-weight: 900;
+}
+
+.profile-banner__identity {
+  min-width: 0;
+}
+
+.profile-banner__identity > span {
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-banner__identity h1 {
+  margin: 0 0 5px;
+  overflow: hidden;
+  font-size: clamp(1.5rem, 4vw, 2.4rem);
+  text-overflow: ellipsis;
+}
+
+.profile-banner__identity p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.profile-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.profile-stats > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.profile-stats > div > span {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-stats small {
+  color: var(--text-faint);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.profile-stats strong {
+  color: var(--text);
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.inventory-empty {
+  margin: 42px 0 0;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.inventory-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.inventory-card__id {
+  position: absolute;
+  top: 12px;
+  left: 13px;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.inventory-card__body {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.inventory-card__body h3 {
+  margin: 8px 0 0;
+  overflow: hidden;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sell-button {
+  width: 100%;
+  min-height: 40px;
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.sell-button:hover {
+  background: var(--surface-hover);
+}

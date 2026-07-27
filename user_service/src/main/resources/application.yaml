@@ -2,13 +2,18 @@ server:
   port: 8081
 
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
   application:
     name: user-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/casino
-    username: casino
-    password: casino
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/casino}
+    username: ${DATABASE_USERNAME:casino}
+    password: ${DATABASE_PASSWORD:casino}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -28,4 +33,13 @@ spring:
 jwt:
   private-key: classpath:keys/private.pem
   public-key: classpath:keys/public.pem
-  expiration: 15m
+  expiration: 60m
+
+admin:
+  email: ${ADMIN_EMAIL:}
+  password: ${ADMIN_PASSWORD:}
+
+services:
+  item-service:
+    url: ${ITEM_SERVICE_URL:http://localhost:8083}
+  internal-token: ${INTERNAL_SERVICE_TOKEN:local-internal-token}

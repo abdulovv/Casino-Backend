@@ -1,0 +1,18 @@
+server:
+  port: 8084
+
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
+  application:
+    name: store-service
+
+services:
+  item-service:
+    url: ${ITEM_SERVICE_URL:http://localhost:8083}
+  user-service:
+    url: ${USER_SERVICE_URL:http://localhost:8081}
+  internal-token: ${INTERNAL_SERVICE_TOKEN:local-internal-token}

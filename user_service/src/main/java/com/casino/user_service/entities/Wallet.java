@@ -23,4 +23,11 @@ public class Wallet {
     @Column(nullable = false)
     private Long balance = 0L;
 
+    public void decreaseBalance(Long amount){
+        balance -= amount;
+    }
+
+    public void increaseBalance(Long amount){
+        balance += amount;
+    }
 }

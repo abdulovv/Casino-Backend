@@ -1,0 +1,327 @@
+@media (max-width: 980px) {
+  .topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .desktop-nav {
+    display: none;
+  }
+
+  .game-mode-list,
+  .product-grid,
+  .inventory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .game-mode-list {
+    grid-template-columns: 1fr;
+  }
+
+  .hub-case-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .roulette-section {
+    width: min(300px, 100%);
+    justify-self: center;
+  }
+
+  .roulette-actions {
+    width: min(680px, calc(100vw - 36px));
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-item-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-case-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    min-height: 62px;
+    padding-inline: 18px;
+  }
+
+  .balance-pill {
+    display: none;
+  }
+
+  .brand__wordmark {
+    font-size: 1.28rem;
+  }
+
+  .profile-menu__trigger {
+    max-width: 150px;
+  }
+
+  .profile-menu__trigger span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-content {
+    width: min(100% - 28px, var(--content-width));
+    min-height: calc(100vh - 122px);
+    padding: 32px 0 92px;
+  }
+
+  .app-content--case-play {
+    height: 100%;
+    min-height: 0;
+    padding: 8px 0;
+    overflow: hidden;
+  }
+
+  .live-feed {
+    min-height: 52px;
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .live-feed__list,
+  .live-feed__entry {
+    height: 52px;
+  }
+
+  .live-feed__price {
+    font-size: 0.7rem;
+  }
+
+  .live-feed__entry img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .toast {
+    top: 150px;
+    right: 14px;
+  }
+
+  .mobile-nav {
+    position: fixed;
+    right: 12px;
+    bottom: 10px;
+    left: 12px;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    min-height: 60px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 17px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .mobile-nav a,
+  .mobile-balance {
+    display: grid;
+    place-items: center;
+    gap: 3px;
+    border-radius: 11px;
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    font-weight: 800;
+  }
+
+  .mobile-nav a.active {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  .mobile-balance {
+    color: var(--balance);
+  }
+
+  .page-hero {
+    align-items: flex-start;
+    padding: 24px;
+  }
+
+  .page-hero > svg {
+    width: 38px;
+  }
+
+  .hub-intro {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    padding: 30px 24px;
+  }
+
+  .hub-intro__visual {
+    min-height: 210px;
+    grid-row: 1;
+  }
+
+  .hub-orbit--one {
+    width: 210px;
+    height: 210px;
+  }
+
+  .hub-orbit--two {
+    width: 145px;
+    height: 145px;
+  }
+
+  .roulette-section {
+    padding-inline: 0;
+  }
+
+  .auth-page__back {
+    position: static;
+  }
+
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-promo {
+    min-height: 300px;
+    padding: 30px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .auth-card {
+    padding: 30px;
+  }
+
+  .profile-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-stats {
+    grid-column: 1 / -1;
+  }
+
+  .admin-item-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  h1 {
+    font-size: clamp(2rem, 11vw, 3.1rem);
+  }
+
+  .login-button {
+    min-height: 38px;
+    padding-inline: 12px;
+    font-size: 0.78rem;
+  }
+
+  .game-mode-list,
+  .hub-case-list,
+  .product-grid,
+  .inventory-grid,
+  .admin-item-list {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-case-list {
+    grid-template-columns: 1fr;
+  }
+
+  .game-mode-card {
+    min-height: 172px;
+    grid-template-columns: minmax(0, 1fr) 92px;
+    padding: 26px 24px;
+  }
+
+  .game-menu-page {
+    min-height: calc(100vh - 186px);
+    padding-inline: 14px;
+  }
+
+  .game-mode-card__visual {
+    width: 78px;
+    height: 78px;
+  }
+
+  .game-mode-card__visual svg {
+    width: 48px;
+    height: 48px;
+  }
+
+  .hub-case-card {
+    min-height: 250px;
+  }
+
+  .form-row,
+  .reward-row {
+    grid-template-columns: 1fr;
+  }
+
+  .reward-row .icon-button {
+    width: 100%;
+  }
+
+  .reward-builder__heading,
+  .section-heading,
+  .hub-catalog__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reward-modal {
+    padding: 32px 20px 24px;
+  }
+
+  .reward-modal__actions {
+    gap: 6px;
+  }
+
+  .reward-modal__actions > * {
+    padding-inline: 6px;
+    font-size: 0.68rem;
+  }
+
+  .reward-modal__secondary-actions {
+    gap: 6px;
+  }
+
+  .reward-modal__secondary-actions > * {
+    padding-inline: 6px;
+    font-size: 0.68rem;
+  }
+
+  .roulette-item {
+    padding-inline: 0;
+  }
+
+  .case-control-tabs button {
+    min-height: 46px;
+    font-size: 0.8rem;
+  }
+
+  .reward-modal__actions,
+  .state-card__actions {
+    flex-direction: column;
+  }
+
+  .state-card {
+    padding: 28px 20px;
+  }
+
+  .page-hero > svg {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+}

@@ -23,9 +23,8 @@ public class CaseItem {
     @JoinColumn(name = "case_id", nullable = false)
     private GameCase gameCase;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "item_id", nullable = false)
-    private Item item;
+    @Column(name = "item_id", nullable = false)
+    private Long itemId;
 
     @Column(nullable = false)
     private Integer weight;

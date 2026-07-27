@@ -1,7 +1,7 @@
 package com.casino.cases_service.dto;
 
+import com.casino.cases_service.clients.dto.ItemResponse;
 import com.casino.cases_service.entities.CaseItem;
-import com.casino.cases_service.entities.Item;
 
 public record CaseItemResponse(
         Long itemId,
@@ -10,14 +10,12 @@ public record CaseItemResponse(
         Long price,
         Integer weight
 ) {
-    public static CaseItemResponse mapToResponse(CaseItem caseItem) {
-        Item item = caseItem.getItem();
-
+    public static CaseItemResponse mapToResponse(CaseItem caseItem, ItemResponse item) {
         return new CaseItemResponse(
-                item.getId(),
-                item.getName(),
-                item.getImageUrl(),
-                item.getPrice(),
+                item.id(),
+                item.name(),
+                item.imageUrl(),
+                item.price(),
                 caseItem.getWeight()
         );
     }

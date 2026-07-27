@@ -5,6 +5,7 @@ import com.casino.user_service.dto.LoginResponse;
 import com.casino.user_service.dto.RegisterRequest;
 import com.casino.user_service.entities.User;
 import com.casino.user_service.entities.Wallet;
+import com.casino.user_service.entities.Role;
 import com.casino.user_service.exceptions.IncorrectPasswordException;
 import com.casino.user_service.exceptions.UserNotFoundException;
 import com.casino.user_service.repositories.UserRepository;
@@ -43,6 +44,7 @@ public class AuthService {
         User user = new User();
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
+        user.setRole(Role.USER);
 
         User savedUser = userRepository.save(user);
 

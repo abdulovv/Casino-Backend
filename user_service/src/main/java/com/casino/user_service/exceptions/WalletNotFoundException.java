@@ -1,6 +1,6 @@
 package com.casino.user_service.exceptions;
 
-public class WalletNotFoundException extends Throwable {
+public class WalletNotFoundException extends RuntimeException {
     public WalletNotFoundException(Long id) {
         super("Wallet not found");
     }

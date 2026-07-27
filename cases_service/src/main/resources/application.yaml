@@ -2,13 +2,18 @@ server:
   port: 8082
 
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
   application:
     name: cases-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/casino
-    username: casino
-    password: casino
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/casino}
+    username: ${DATABASE_USERNAME:casino}
+    password: ${DATABASE_PASSWORD:casino}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -31,6 +36,22 @@ spring:
         jwt:
           public-key-location: classpath:keys/public.pem
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
 logging:
   level:
     org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE
+
+services:
+  user-service:
+    url: ${USER_SERVICE_URL:http://localhost:8081}
+  item-service:
+    url: ${ITEM_SERVICE_URL:http://localhost:8083}
+  internal-token: ${INTERNAL_SERVICE_TOKEN:local-internal-token}
+
+storage:
+  images-directory: ${CASE_IMAGES_DIRECTORY:./uploads/cases}
+  public-base-url: /api/cases/images

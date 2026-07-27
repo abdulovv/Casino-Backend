@@ -3,8 +3,10 @@ package com.casino.cases_service.controllers;
 import com.casino.cases_service.dto.GameCaseDetailsResponse;
 import com.casino.cases_service.dto.GameCaseResponse;
 import com.casino.cases_service.dto.OpenCaseResponse;
+import com.casino.cases_service.dto.RecentDropResponse;
 import com.casino.cases_service.services.GameCaseService;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,14 +22,22 @@ public class GameCasesController {
         return gameCaseService.findAllGameCases();
     }
 
+    @GetMapping("/recent-drops")
+    public List<RecentDropResponse> getRecentDrops() {
+        return gameCaseService.findRecentDrops();
+    }
+
     @GetMapping("/{id}")
     public GameCaseDetailsResponse getGameCaseById(@PathVariable Long id){
         return gameCaseService.findGameCaseById(id);
     }
 
     @PostMapping("/{id}/open")
-    public OpenCaseResponse openGameCase(@PathVariable Long id) {
-        return gameCaseService.openGameCase(id);
+    public OpenCaseResponse openGameCase(
+            @PathVariable Long id,
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization
+    ) {
+        return gameCaseService.openGameCase(id, authorization);
     }
 
 }

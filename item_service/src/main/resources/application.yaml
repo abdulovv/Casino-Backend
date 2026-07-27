@@ -1,0 +1,46 @@
+server:
+  port: 8083
+
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
+  application:
+    name: item-service
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/casino}
+    username: ${DATABASE_USERNAME:casino}
+    password: ${DATABASE_PASSWORD:casino}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_schema_history_items
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: classpath:keys/public.pem
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+storage:
+  images-directory: ${ITEM_IMAGES_DIRECTORY:./uploads/items}
+  public-base-url: /api/items/images

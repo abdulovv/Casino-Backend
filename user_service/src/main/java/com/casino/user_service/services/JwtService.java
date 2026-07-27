@@ -31,6 +31,7 @@ public class JwtService {
                 .issuedAt(now)
                 .expiresAt(now.plus(expiration))
                 .claim("email", user.getEmail())
+                .claim("role", user.getRole().name())
                 .build();
 
         JwsHeader header = JwsHeader
