@@ -35,7 +35,18 @@
   background: #fff;
 }
 
-.secondary-button,
+.primary-button--danger {
+  background: #d98a95;
+  color: #2d1116;
+}
+
+.reward-inventory-button,
+.sell-button{
+  border-color: var(--border-strong);
+  background: #39363f;
+  color: var(--text);
+}
+
 .login-button {
   border-color: var(--border-strong);
   background: var(--surface-raised);
@@ -492,5 +503,75 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(5 5 6 / 72%);
+  backdrop-filter: blur(8px);
+}
+
+.confirm-dialog {
+  display: grid;
+  width: min(390px, 100%);
+  justify-items: center;
+  padding: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: #211e24;
+  box-shadow: var(--shadow);
+  text-align: center;
+  animation: confirm-dialog-enter 160ms ease-out both;
+}
+
+.confirm-dialog__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 15px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--balance-soft);
+  color: var(--balance);
+}
+
+.confirm-dialog__icon--danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 10px;
+  font-size: 1.45rem;
+}
+
+.confirm-dialog p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.confirm-dialog__actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.confirm-dialog__actions > button {
+  width: 100%;
+}
+
+@keyframes confirm-dialog-enter {
+  from {
+    transform: translateY(10px) scale(0.97);
+    opacity: 0;
   }
 }

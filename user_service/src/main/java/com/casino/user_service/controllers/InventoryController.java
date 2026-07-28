@@ -26,6 +26,12 @@ public class InventoryController {
         return inventoryService.findAllItemsByUserId(userId);
     }
 
+    @GetMapping("/{inventoryItemId}")
+    public InventoryItemResponse getInventoryItemById(@AuthenticationPrincipal Jwt jwt, @PathVariable Long inventoryItemId){
+        Long userId = Long.valueOf(jwt.getSubject());
+        return inventoryService.findItemsById(userId, inventoryItemId);
+    }
+
     @PostMapping("/{inventoryItemId}/sell")
     public SellInventoryItemResponse sellInventoryItem(
             @AuthenticationPrincipal Jwt jwt,
@@ -34,4 +40,6 @@ public class InventoryController {
         Long userId = Long.valueOf(jwt.getSubject());
         return inventorySaleService.sell(userId, inventoryItemId);
     }
+
+
 }

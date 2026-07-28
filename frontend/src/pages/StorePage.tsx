@@ -2,6 +2,7 @@ import { RefreshCw, ShoppingBag } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CaseVisual } from "../components/CaseVisual";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, formatCoins, getFriendlyError } from "../lib/api";
 import type { ItemResponse, StorePurchaseResponse } from "../types/api";
@@ -12,6 +13,8 @@ export function StorePage() {
   const [items, setItems] = useState<ItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [buyingItemId, setBuyingItemId] = useState<number | null>(null);
+  const [pendingPurchase, setPendingPurchase] =
+    useState<ItemResponse | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -43,6 +46,7 @@ export function StorePage() {
     }
 
     setBuyingItemId(item.id);
+    setPendingPurchase(null);
     setError("");
     setNotice("");
 
@@ -126,7 +130,13 @@ export function StorePage() {
                       className="primary-button"
                       type="button"
                       disabled={buyingItemId !== null}
-                      onClick={() => buyItem(item)}
+                      onClick={() => {
+                        if (!token) {
+                          void buyItem(item);
+                          return;
+                        }
+                        setPendingPurchase(item);
+                      }}
                     >
                       {buyingItemId === item.id
                         ? "Покупаем…"
@@ -141,6 +151,17 @@ export function StorePage() {
           </div>
         )}
       </section>
+
+      {pendingPurchase && (
+        <ConfirmDialog
+          title="Подтвердить покупку?"
+          message={`Купить «${pendingPurchase.name}» за ${formatCoins(pendingPurchase.price)} ⭐?`}
+          confirmLabel="Да, купить"
+          loading={buyingItemId === pendingPurchase.id}
+          onCancel={() => setPendingPurchase(null)}
+          onConfirm={() => void buyItem(pendingPurchase)}
+        />
+      )}
     </main>
   );
 }

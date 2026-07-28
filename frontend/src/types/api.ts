@@ -86,6 +86,18 @@ export interface SellInventoryItemResponse {
   balance: number;
 }
 
+export interface UpgradeResponse {
+  success: boolean;
+  chancePercent: number;
+  rollPercent: number;
+  sourceInventoryItemIds: number[];
+  sourceItemIds: number[];
+  targetItemId: number;
+  rewardInventoryItemId: number | null;
+  sourcePrice: number;
+  targetPrice: number;
+}
+
 export interface ImageUploadResponse {
   url: string;
 }

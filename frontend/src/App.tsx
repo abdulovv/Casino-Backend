@@ -9,6 +9,7 @@ import { HomePage } from "./pages/HomePage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { StorePage } from "./pages/StorePage";
 import { AdminPage } from "./pages/AdminPage";
+import { UpgradePage } from "./pages/UpgradePage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, initializing } = useAuth();
@@ -44,7 +45,14 @@ function App() {
         <Route path="/cases" element={<CasesPage />} />
         <Route path="/cases/:caseId" element={<CasePage />} />
         <Route path="/store" element={<StorePage />} />
-        <Route path="/upgrade" element={<DevelopmentPage mode="upgrade" />} />
+        <Route
+          path="/upgrade"
+          element={
+            <ProtectedRoute>
+              <UpgradePage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/crash" element={<DevelopmentPage mode="crash" />} />
         <Route
           path="/inventory"

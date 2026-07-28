@@ -34,3 +34,8 @@ spring:
               uri: ${STORE_SERVICE_URL:http://localhost:8084}
               predicates:
                 - Path=/api/store/**
+
+            - id: upgrader-service
+              uri: ${UPGRADER_SERVICE_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/upgrader/**

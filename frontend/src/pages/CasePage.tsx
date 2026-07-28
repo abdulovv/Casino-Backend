@@ -54,13 +54,13 @@ function getRewardTier(price: number): RewardTier {
   if (price <= 200) {
       return "gray";
   }
-  if (price <= 500) {
+  if (price <= 400) {
     return "green";
   }
-  if (price <= 1_000) {
+  if (price <= 700) {
     return "violet";
   }
-  if (price <= 3_000) {
+  if (price <= 4600) {
     return "pink";
   }
   if (price <= 10_000) {
@@ -423,17 +423,7 @@ export function CasePage() {
   }
 
   function closeReward() {
-    setReward(null);
-    setRewardIsDemo(false);
-    setRewardError("");
-    setSellingReward(false);
-    setPendingDemoReward(null);
-    setSpinOffset(null);
-    setReelMode("idle");
-
-    if (gameCase) {
-      setReelItems(createIdleSequence(gameCase.items));
-    }
+    window.location.reload();
   }
 
   async function sellReward() {
@@ -709,11 +699,11 @@ export function CasePage() {
                     className="secondary-button reward-inventory-button"
                     to="/inventory"
                     onClick={(event) => {
+                      event.preventDefault();
                       if (sellingReward) {
-                        event.preventDefault();
                         return;
                       }
-                      closeReward();
+                      window.location.assign("/inventory");
                     }}
                     aria-disabled={sellingReward}
                     tabIndex={sellingReward ? -1 : undefined}

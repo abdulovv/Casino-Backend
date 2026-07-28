@@ -1,6 +1,7 @@
 import { Boxes, PackageOpen, RefreshCw, Tag } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CaseVisual } from "../components/CaseVisual";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Toast } from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, formatCoins, getFriendlyError } from "../lib/api";
@@ -19,6 +20,8 @@ export function InventoryPage() {
   const [items, setItems] = useState<InventoryViewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sellingId, setSellingId] = useState<number | null>(null);
+  const [pendingSale, setPendingSale] =
+    useState<InventoryViewItem | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -62,6 +65,7 @@ export function InventoryPage() {
     }
 
     setSellingId(item.id);
+    setPendingSale(null);
     setError("");
     setNotice("");
 
@@ -195,7 +199,7 @@ export function InventoryPage() {
                     className="sell-button"
                     type="button"
                     disabled={sellingId !== null || !item.details}
-                    onClick={() => sellItem(item)}
+                    onClick={() => setPendingSale(item)}
                   >
                     <Tag size={16} />
                     {sellingId === item.id ? "Продаём…" : "Продать"}
@@ -206,6 +210,18 @@ export function InventoryPage() {
           </div>
         )}
       </section>
+
+      {pendingSale && (
+        <ConfirmDialog
+          title="Продать предмет?"
+          message={`Точно продать «${pendingSale.details?.name ?? `Предмет #${pendingSale.item_id}`}» за ${formatCoins(pendingSale.details?.price ?? 0)} ⭐?`}
+          confirmLabel="Да, продать"
+          tone="danger"
+          loading={sellingId === pendingSale.id}
+          onCancel={() => setPendingSale(null)}
+          onConfirm={() => void sellItem(pendingSale)}
+        />
+      )}
     </main>
   );
 }

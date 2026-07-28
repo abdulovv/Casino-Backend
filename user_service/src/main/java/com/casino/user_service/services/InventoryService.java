@@ -1,13 +1,11 @@
 package com.casino.user_service.services;
 
-import com.casino.user_service.dto.AddInventoryItemRequest;
-import com.casino.user_service.dto.InventoryItemResponse;
-import com.casino.user_service.dto.PurchaseInventoryItemRequest;
-import com.casino.user_service.dto.PurchaseInventoryItemResponse;
+import com.casino.user_service.dto.*;
 import com.casino.user_service.entities.InventoryItem;
 import com.casino.user_service.entities.User;
 import com.casino.user_service.entities.Wallet;
 import com.casino.user_service.exceptions.InsufficientBalanceException;
+import com.casino.user_service.exceptions.InventoryItemNotFoundException;
 import com.casino.user_service.exceptions.UserNotFoundException;
 import com.casino.user_service.exceptions.WalletNotFoundException;
 import com.casino.user_service.repositories.InventoryRepository;
@@ -28,9 +26,21 @@ public class InventoryService  {
     private final WalletRepository walletRepository;
 
     public List<InventoryItemResponse> findAllItemsByUserId(Long id) throws UserNotFoundException {
-        Optional<List<InventoryItem>> inventoryItemsOptional = Optional.ofNullable(inventoryRepository.findAllByUserId(id));
-        List<InventoryItem> inventoryItems = inventoryItemsOptional.orElseThrow(() -> new UserNotFoundException(id));
-        return InventoryItemResponse.mapToResponseList(inventoryItems);
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException(id);
+        }
+        return InventoryItemResponse.mapToResponseList(
+                inventoryRepository.findAllByUserId(id)
+        );
+    }
+
+    public InventoryItemResponse findItemsById(Long userId, Long inventoryItemId) {
+        InventoryItem inventoryItem = inventoryRepository
+                .findOneByIdAndUserId(inventoryItemId, userId)
+                .orElseThrow(() ->
+                        new InventoryItemNotFoundException(inventoryItemId)
+                );
+        return InventoryItemResponse.mapToInventoryItemResponse(inventoryItem);
     }
 
     @Transactional
@@ -43,6 +53,68 @@ public class InventoryService  {
         newInventoryItem.setItemId(addInventoryItemRequest.itemId());
         inventoryRepository.save(newInventoryItem);
         return InventoryItemResponse.mapToInventoryItemResponse(newInventoryItem);
+    }
+
+    @Transactional
+    public void removeItemFromInventory(
+            Long userId,
+            RemoveInventoryItemRequest request
+    ) {
+        InventoryItem inventoryItem = inventoryRepository
+                .findByIdAndUserId(request.inventoryItemId(), userId)
+                .orElseThrow(() ->
+                        new InventoryItemNotFoundException(request.inventoryItemId())
+                );
+        inventoryRepository.delete(inventoryItem);
+    }
+
+    @Transactional
+    public ApplyUpgradeResponse applyUpgrade(
+            Long userId,
+            ApplyUpgradeRequest request
+    ) {
+        List<Long> requestedIds = request.sourceInventoryItemIds()
+                .stream()
+                .distinct()
+                .sorted()
+                .toList();
+        if (requestedIds.size() != request.sourceInventoryItemIds().size()) {
+            throw new IllegalArgumentException(
+                    "Stake contains duplicate inventory items"
+            );
+        }
+
+        List<InventoryItem> sourceItems =
+                inventoryRepository.findAllForUpgrade(userId, requestedIds);
+        if (sourceItems.size() != requestedIds.size()) {
+            Long missingItemId = requestedIds.stream()
+                    .filter(requestedId -> sourceItems.stream()
+                            .noneMatch(item -> item.getId().equals(requestedId))
+                    )
+                    .findFirst()
+                    .orElse(requestedIds.getFirst());
+            throw new InventoryItemNotFoundException(missingItemId);
+        }
+
+        List<Long> consumedInventoryItemIds = sourceItems.stream()
+                .map(InventoryItem::getId)
+                .toList();
+        User user = sourceItems.getFirst().getUser();
+        inventoryRepository.deleteAll(sourceItems);
+
+        Long rewardInventoryItemId = null;
+        if (request.success()) {
+            InventoryItem rewardItem = new InventoryItem();
+            rewardItem.setUser(user);
+            rewardItem.setItemId(request.targetItemId());
+            inventoryRepository.save(rewardItem);
+            rewardInventoryItemId = rewardItem.getId();
+        }
+
+        return new ApplyUpgradeResponse(
+                consumedInventoryItemIds,
+                rewardInventoryItemId
+        );
     }
 
     @Transactional

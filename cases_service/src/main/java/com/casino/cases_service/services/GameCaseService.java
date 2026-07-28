@@ -2,10 +2,9 @@ package com.casino.cases_service.services;
 
 import com.casino.cases_service.clients.UserServiceClient;
 import com.casino.cases_service.clients.ItemServiceClient;
-import com.casino.cases_service.clients.dto.AddInventoryItemRequest;
-import com.casino.cases_service.clients.dto.DebitWalletRequest;
 import com.casino.cases_service.clients.dto.ItemResponse;
-import com.casino.cases_service.clients.dto.InventoryItemResponse;
+import com.casino.cases_service.clients.dto.PurchaseInventoryItemRequest;
+import com.casino.cases_service.clients.dto.PurchaseInventoryItemResponse;
 import com.casino.cases_service.dto.CaseItemResponse;
 import com.casino.cases_service.dto.GameCaseDetailsResponse;
 import com.casino.cases_service.dto.GameCaseResponse;
@@ -55,7 +54,9 @@ public class GameCaseService {
     }
 
     public GameCaseDetailsResponse findGameCaseById(Long id) {
-        GameCase gameCase = gameCaseRepository.findById(id).orElseThrow(() -> new GameCaseNotFound(id));
+        GameCase gameCase = gameCaseRepository
+                .findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new GameCaseNotFound(id));
         List<CaseItem> caseItems = caseItemRepository.findAllByGameCaseId(id);
         List<CaseItemResponse> itemResponses = caseItems.stream()
                 .map(caseItem -> CaseItemResponse.mapToResponse(
@@ -81,19 +82,17 @@ public class GameCaseService {
     }
 
     public OpenCaseResponse openGameCase(Long id, String authorization) {
-        GameCase gameCase = gameCaseRepository.findById(id).orElseThrow(() -> new GameCaseNotFound(id));
-        DebitWalletRequest debitWalletRequest = new DebitWalletRequest(gameCase.getPrice());
-        userServiceClient.debit(authorization, debitWalletRequest);
+        GameCase gameCase = gameCaseRepository
+                .findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new GameCaseNotFound(id));
         List<CaseItem> caseItems = caseItemRepository.findAllByGameCaseId(id);
         CaseItem reward = rewardSelectionService.selectReward(caseItems);
         ItemResponse item = itemServiceClient.getItemById(reward.getItemId());
 
-        AddInventoryItemRequest addInventoryItemRequest =
-                new AddInventoryItemRequest(item.id());
-        InventoryItemResponse inventoryItem = userServiceClient.addInventoryItem(
+        PurchaseInventoryItemResponse purchase = userServiceClient.purchaseItem(
                 authorization,
                 internalToken,
-                addInventoryItemRequest
+                new PurchaseInventoryItemRequest(item.id(), gameCase.getPrice())
         );
 
         try {
@@ -102,6 +101,6 @@ public class GameCaseService {
             log.warn("Could not save recent case drop for item {}", item.id(), exception);
         }
 
-        return OpenCaseResponse.mapToResponse(item, inventoryItem.id());
+        return OpenCaseResponse.mapToResponse(item, purchase.inventoryItemId());
     }
 }

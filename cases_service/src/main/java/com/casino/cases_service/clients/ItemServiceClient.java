@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.PathVariable;
         url = "${services.item-service.url}"
 )
 public interface ItemServiceClient {
-
     @GetMapping("/api/items/{itemId}")
     ItemResponse getItemById(@PathVariable Long itemId);
 }

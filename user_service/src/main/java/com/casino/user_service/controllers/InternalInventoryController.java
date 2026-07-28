@@ -1,13 +1,11 @@
 package com.casino.user_service.controllers;
 
-import com.casino.user_service.dto.AddInventoryItemRequest;
-import com.casino.user_service.dto.InventoryItemResponse;
-import com.casino.user_service.dto.PurchaseInventoryItemRequest;
-import com.casino.user_service.dto.PurchaseInventoryItemResponse;
+import com.casino.user_service.dto.*;
 import com.casino.user_service.services.InternalApiAuthorizer;
 import com.casino.user_service.services.InventoryService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +23,7 @@ public class InternalInventoryController {
     private final InventoryService inventoryService;
     private final InternalApiAuthorizer internalApiAuthorizer;
 
-    @PostMapping
+    @PostMapping("/add")
     public InventoryItemResponse addInventoryItem(
             @AuthenticationPrincipal Jwt jwt,
             @RequestHeader(INTERNAL_TOKEN_HEADER) String internalToken,
@@ -34,6 +32,29 @@ public class InternalInventoryController {
         internalApiAuthorizer.authorize(internalToken);
         Long userId = Long.valueOf(jwt.getSubject());
         return inventoryService.addItemToInventory(userId, request);
+    }
+
+    @PostMapping("/remove")
+    public ResponseEntity<Void> removeInventoryItem(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(INTERNAL_TOKEN_HEADER) String internalToken,
+            @Valid @RequestBody RemoveInventoryItemRequest request
+    ) {
+        internalApiAuthorizer.authorize(internalToken);
+        Long userId = Long.valueOf(jwt.getSubject());
+        inventoryService.removeItemFromInventory(userId, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/upgrade")
+    public ApplyUpgradeResponse applyUpgrade(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(INTERNAL_TOKEN_HEADER) String internalToken,
+            @Valid @RequestBody ApplyUpgradeRequest request
+    ) {
+        internalApiAuthorizer.authorize(internalToken);
+        Long userId = Long.valueOf(jwt.getSubject());
+        return inventoryService.applyUpgrade(userId, request);
     }
 
     @PostMapping("/purchase")

@@ -6,11 +6,13 @@ import com.casino.cases_service.exceptions.IncorrectSelectRewardAlgorithmExcepti
 import com.casino.cases_service.exceptions.IncorrectTotalCaseItemsWeight;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class RewardSelectionService {
+    private final SecureRandom secureRandom = new SecureRandom();
+
     public CaseItem selectReward(List<CaseItem> caseItems) {
         if (caseItems == null || caseItems.isEmpty()) {
             throw new EmptyGameCaseException();
@@ -25,7 +27,7 @@ public class RewardSelectionService {
             throw new IncorrectTotalCaseItemsWeight();
         }
 
-        int randomWeight = ThreadLocalRandom.current().nextInt(totalWeight);
+        int randomWeight = secureRandom.nextInt(totalWeight);
         int accumulatedWeight = 0;
 
         for (CaseItem caseItem : caseItems) {

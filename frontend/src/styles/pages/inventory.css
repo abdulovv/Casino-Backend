@@ -134,7 +134,7 @@
   width: 100%;
   min-height: 40px;
   border-color: var(--border-strong);
-  background: var(--surface-raised);
+  background: #39363f;
   color: var(--text);
 }
 

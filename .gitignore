@@ -1,5 +1,7 @@
 target/
 uploads/
+.m2/
+.pnpm-store/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

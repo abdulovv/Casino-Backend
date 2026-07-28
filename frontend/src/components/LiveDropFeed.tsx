@@ -3,7 +3,7 @@ import { apiRequest, resolveAssetUrl } from "../lib/api";
 import type { RecentDropResponse } from "../types/api";
 
 const REFRESH_INTERVAL_MS = 5_000;
-const MINIMUM_VISIBLE_DROPS = 32;
+const MINIMUM_VISIBLE_DROPS = 16;
 
 export function LiveDropFeed() {
   const [drops, setDrops] = useState<RecentDropResponse[]>([]);
@@ -30,8 +30,7 @@ export function LiveDropFeed() {
 
     void loadRecentDrops();
     const refreshTimer = window.setInterval(
-      loadRecentDrops,
-      REFRESH_INTERVAL_MS,
+      loadRecentDrops
     );
 
     return () => {

@@ -1,3 +1,6 @@
+server:
+  port: 8085
+
 spring:
   config:
     import:
@@ -6,3 +9,19 @@ spring:
 
   application:
     name: upgrader-service
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: classpath:keys/public.pem
+
+services:
+  user-service:
+    url: ${USER_SERVICE_URL:http://localhost:8081}
+  item-service:
+    url: ${ITEM_SERVICE_URL:http://localhost:8083}
+  internal-token: ${INTERNAL_SERVICE_TOKEN:local-internal-token}
+
+upgrader:
+  house-edge-bps: ${UPGRADER_HOUSE_EDGE_BPS:1000}
