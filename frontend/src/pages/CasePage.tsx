@@ -476,9 +476,7 @@ export function CasePage() {
     }
   }
 
-  if (loading) {
-    return <div className="page-loader">Собираем содержимое кейса…</div>;
-  }
+
 
   if (!gameCase || pageError) {
     return (

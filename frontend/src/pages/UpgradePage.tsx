@@ -42,17 +42,56 @@ type RewardTier = "gray" | "green" | "violet" | "pink" | "red" | "yellow";
 const HOUSE_EDGE_BPS = 1_000;
 const BASIS_POINTS = 10_000;
 const PROBABILITY_SCALE = 1_000_000;
-const BALL_FLIGHT_MS = 4_000;
-const REQUIRED_WALL_BOUNCES = 40;
+const BALL_ACCELERATION_DISTANCE = 0.02;
+const BALL_START_SPEED_FACTOR = 0.52;
+const BALL_STOP_SPEED_FACTOR = 0.02;
+const BALL_MAX_SPEED_PX_PER_SECOND = 10000;
+const BALL_MIN_FLIGHT_MS = 7800;
+const BALL_KEYFRAME_STEP_PX = 7;
+const BALL_SETTLE_HOLD_MS = 200;
+const MOTION_PROFILE_SAMPLES = 2000;
+const MAX_SIMULATED_WALL_BOUNCES = 100;
+const LANDING_BOUNCE_MIN = 20;
+const LANDING_BOUNCE_MAX = 25;
+const MAX_TRAJECTORY_ATTEMPTS = 1600;
+const MIN_WALL_POINT_CORNER_DISTANCE = 6;
+const MIN_FINAL_WALL_ZONE_DEPTH = 1.5;
+const MIN_TOTAL_BRAKING_DISTANCE_PX = 1050;
+const BRAKING_LEAD_IN_MIN_PX = 620;
+const BRAKING_LEAD_IN_MAX_PX = 680;
+const MAX_BRAKING_PATH_FRACTION = 0.42;
+const ARENA_BOUNDS = {
+  left: 4,
+  right: 96,
+  top: 8,
+  bottom: 91,
+} as const;
 const MAX_STAKE_ITEMS = 5;
-const MIN_VISUAL_SUCCESS_ZONE = 15;
+const MIN_VISUAL_SUCCESS_ZONE = 20;
 
 interface BallPoint {
   x: number;
   y: number;
 }
 
-type ArenaZoneSide = "left" | "right" | "top" | "bottom";
+type ArenaWall = "left" | "right" | "top" | "bottom";
+
+interface WallBounce {
+  point: BallPoint;
+  wall: ArenaWall;
+}
+
+interface PlannedBallTrajectory {
+  points: BallPoint[];
+  brakingStartDistanceProgress: number;
+}
+
+interface LandingCandidate {
+  bounceNumber: number;
+  brakingStartDistanceProgress: number;
+}
+
+type ArenaZoneSide = ArenaWall;
 
 interface ArenaZoneVariant {
   side: ArenaZoneSide;
@@ -243,90 +282,434 @@ function getRewardTier(price: number): RewardTier {
   return "yellow";
 }
 
+function randomBetween(minimum: number, maximum: number) {
+  return minimum + Math.random() * (maximum - minimum);
+}
+
+function clampProgress(progress: number) {
+  return Math.min(1, Math.max(0, progress));
+}
+
+function getBallSpeedFactor(
+  distanceProgress: number,
+  decelerationStartProgress: number,
+) {
+  if (distanceProgress < BALL_ACCELERATION_DISTANCE) {
+    const accelerationProgress =
+      distanceProgress / BALL_ACCELERATION_DISTANCE;
+
+    return Math.sqrt(
+      BALL_START_SPEED_FACTOR ** 2 +
+        (1 - BALL_START_SPEED_FACTOR ** 2) * accelerationProgress,
+    );
+  }
+
+  if (distanceProgress > decelerationStartProgress) {
+    const remainingDistanceProgress =
+      (1 - distanceProgress) / (1 - decelerationStartProgress);
+
+    return (
+      BALL_STOP_SPEED_FACTOR +
+      (1 - BALL_STOP_SPEED_FACTOR) * clampProgress(remainingDistanceProgress)
+    );
+  }
+
+  return 1;
+}
+
+function sampleTrajectory(
+  trajectory: BallPoint[],
+  arenaWidth: number,
+  arenaHeight: number,
+) {
+  if (trajectory.length <= 1) {
+    return trajectory;
+  }
+
+  const sampledPoints: BallPoint[] = [trajectory[0]];
+
+  for (let index = 1; index < trajectory.length; index += 1) {
+    const start = trajectory[index - 1];
+    const finish = trajectory[index];
+    const deltaX = ((finish.x - start.x) / 100) * arenaWidth;
+    const deltaY = ((finish.y - start.y) / 100) * arenaHeight;
+    const segmentLength = Math.hypot(deltaX, deltaY);
+    const stepCount = Math.max(
+      1,
+      Math.ceil(segmentLength / BALL_KEYFRAME_STEP_PX),
+    );
+
+    for (let step = 1; step <= stepCount; step += 1) {
+      const progress = step / stepCount;
+      sampledPoints.push({
+        x: start.x + (finish.x - start.x) * progress,
+        y: start.y + (finish.y - start.y) * progress,
+      });
+    }
+  }
+
+  return sampledPoints;
+}
+
+function createMotionTiming(
+  distanceOffsets: number[],
+  decelerationStartProgress: number,
+  totalLength: number,
+) {
+  const cumulativeTimes = [0];
+
+  for (let sample = 1; sample <= MOTION_PROFILE_SAMPLES; sample += 1) {
+    const previousDistance = (sample - 1) / MOTION_PROFILE_SAMPLES;
+    const currentDistance = sample / MOTION_PROFILE_SAMPLES;
+    const middleDistance = (previousDistance + currentDistance) / 2;
+    const distanceDelta = currentDistance - previousDistance;
+    const timeDelta =
+      distanceDelta /
+      getBallSpeedFactor(middleDistance, decelerationStartProgress);
+
+    cumulativeTimes.push(cumulativeTimes.at(-1)! + timeDelta);
+  }
+
+  const normalizedMotionTime = cumulativeTimes.at(-1) ?? 1;
+  const motionDurationMs = Math.max(
+    BALL_MIN_FLIGHT_MS,
+    (totalLength / BALL_MAX_SPEED_PX_PER_SECOND) *
+      normalizedMotionTime *
+      1_000,
+  );
+  const durationMs = motionDurationMs + BALL_SETTLE_HOLD_MS;
+  const motionEndOffset = motionDurationMs / durationMs;
+
+  const offsets = distanceOffsets.map((distanceOffset, index) => {
+    if (index === 0) return 0;
+    if (index === distanceOffsets.length - 1) return motionEndOffset;
+
+    const samplePosition =
+      clampProgress(distanceOffset) * MOTION_PROFILE_SAMPLES;
+    const lowerSample = Math.floor(samplePosition);
+    const upperSample = Math.min(
+      MOTION_PROFILE_SAMPLES,
+      lowerSample + 1,
+    );
+    const sampleFraction = samplePosition - lowerSample;
+    const lowerTime = cumulativeTimes[lowerSample];
+    const upperTime = cumulativeTimes[upperSample];
+    const normalizedTime =
+      (lowerTime + (upperTime - lowerTime) * sampleFraction) /
+      normalizedMotionTime;
+
+    return normalizedTime * motionEndOffset;
+  });
+
+  return { offsets, durationMs };
+}
+
+function getNextWallBounce(
+  point: BallPoint,
+  velocity: BallPoint,
+): WallBounce | null {
+  const candidates: Array<WallBounce & { time: number }> = [];
+  const epsilon = 0.0001;
+
+  if (velocity.x < -epsilon) {
+    candidates.push({
+      point: { x: ARENA_BOUNDS.left, y: point.y },
+      wall: "left",
+      time: (ARENA_BOUNDS.left - point.x) / velocity.x,
+    });
+  } else if (velocity.x > epsilon) {
+    candidates.push({
+      point: { x: ARENA_BOUNDS.right, y: point.y },
+      wall: "right",
+      time: (ARENA_BOUNDS.right - point.x) / velocity.x,
+    });
+  }
+
+  if (velocity.y < -epsilon) {
+    candidates.push({
+      point: { x: point.x, y: ARENA_BOUNDS.top },
+      wall: "top",
+      time: (ARENA_BOUNDS.top - point.y) / velocity.y,
+    });
+  } else if (velocity.y > epsilon) {
+    candidates.push({
+      point: { x: point.x, y: ARENA_BOUNDS.bottom },
+      wall: "bottom",
+      time: (ARENA_BOUNDS.bottom - point.y) / velocity.y,
+    });
+  }
+
+  const next = candidates
+    .filter((candidate) => candidate.time > epsilon)
+    .sort((first, second) => first.time - second.time)[0];
+
+  if (!next) {
+    return null;
+  }
+
+  return {
+    wall: next.wall,
+    point: {
+      x: Math.min(
+        ARENA_BOUNDS.right,
+        Math.max(ARENA_BOUNDS.left, point.x + velocity.x * next.time),
+      ),
+      y: Math.min(
+        ARENA_BOUNDS.bottom,
+        Math.max(ARENA_BOUNDS.top, point.y + velocity.y * next.time),
+      ),
+    },
+  };
+}
+
+function isBounceAwayFromCorner(bounce: WallBounce) {
+  if (bounce.wall === "left" || bounce.wall === "right") {
+    return (
+      bounce.point.y - ARENA_BOUNDS.top >=
+        MIN_WALL_POINT_CORNER_DISTANCE &&
+      ARENA_BOUNDS.bottom - bounce.point.y >=
+        MIN_WALL_POINT_CORNER_DISTANCE
+    );
+  }
+
+  return (
+    bounce.point.x - ARENA_BOUNDS.left >=
+      MIN_WALL_POINT_CORNER_DISTANCE &&
+    ARENA_BOUNDS.right - bounce.point.x >=
+      MIN_WALL_POINT_CORNER_DISTANCE
+  );
+}
+
+function reflectVelocity(velocity: BallPoint, wall: ArenaWall): BallPoint {
+  if (wall === "left" || wall === "right") {
+    return { x: -velocity.x, y: velocity.y };
+  }
+
+  return { x: velocity.x, y: -velocity.y };
+}
+
+function getPixelDistance(
+  start: BallPoint,
+  finish: BallPoint,
+  arenaWidth: number,
+  arenaHeight: number,
+) {
+  return Math.hypot(
+    ((finish.x - start.x) / 100) * arenaWidth,
+    ((finish.y - start.y) / 100) * arenaHeight,
+  );
+}
+
+function getZoneEntryProgress(
+  start: BallPoint,
+  finish: BallPoint,
+  success: boolean,
+  zone: ArenaZoneGeometry,
+) {
+  const zoneDirection = success ? 1 : -1;
+  const startDepth = zone.depth(start) * zoneDirection;
+  const finishDepth = zone.depth(finish) * zoneDirection;
+
+  if (finishDepth < MIN_FINAL_WALL_ZONE_DEPTH) {
+    return null;
+  }
+
+  if (startDepth >= 0) {
+    return 0;
+  }
+
+  const depthDelta = finishDepth - startDepth;
+  if (depthDelta <= 0.0001) {
+    return null;
+  }
+
+  return clampProgress(-startDepth / depthDelta);
+}
+
+function isPointAtArenaCorner(point: BallPoint) {
+  const cornerEpsilon = 0.001;
+  const touchesHorizontalWall =
+    Math.abs(point.x - ARENA_BOUNDS.left) <= cornerEpsilon ||
+    Math.abs(point.x - ARENA_BOUNDS.right) <= cornerEpsilon;
+  const touchesVerticalWall =
+    Math.abs(point.y - ARENA_BOUNDS.top) <= cornerEpsilon ||
+    Math.abs(point.y - ARENA_BOUNDS.bottom) <= cornerEpsilon;
+
+  return touchesHorizontalWall && touchesVerticalWall;
+}
+
+function createPhysicalBouncePath(
+  initialAngleRadians: number,
+  arenaWidth: number,
+  arenaHeight: number,
+) {
+  const start: BallPoint = { x: 50, y: 74 };
+  const points: BallPoint[] = [start];
+  const bounces: WallBounce[] = [];
+  let currentPoint = start;
+  // Convert the pixel-space angle to percentage-space velocity so that
+  // reflections remain visually correct in a non-square arena.
+  let velocity: BallPoint = {
+    x: (Math.cos(initialAngleRadians) / arenaWidth) * 100,
+    y: (Math.sin(initialAngleRadians) / arenaHeight) * 100,
+  };
+
+  for (
+    let bounceNumber = 1;
+    bounceNumber <= MAX_SIMULATED_WALL_BOUNCES;
+    bounceNumber += 1
+  ) {
+    const bounce = getNextWallBounce(currentPoint, velocity);
+
+    if (!bounce || isPointAtArenaCorner(bounce.point)) {
+      return null;
+    }
+
+    points.push(bounce.point);
+    bounces.push(bounce);
+    currentPoint = bounce.point;
+    velocity = reflectVelocity(velocity, bounce.wall);
+  }
+
+  return { points, bounces };
+}
+
+function findLandingCandidates(
+  physicalPath: NonNullable<ReturnType<typeof createPhysicalBouncePath>>,
+  success: boolean,
+  zone: ArenaZoneGeometry,
+  arenaWidth: number,
+  arenaHeight: number,
+): LandingCandidate[] {
+  const candidates: LandingCandidate[] = [];
+
+  for (
+    let bounceNumber = LANDING_BOUNCE_MIN;
+    bounceNumber <= LANDING_BOUNCE_MAX;
+    bounceNumber += 1
+  ) {
+    const segmentStart = physicalPath.points[bounceNumber - 1];
+    const wallPoint = physicalPath.points[bounceNumber];
+    const finalBounce = physicalPath.bounces[bounceNumber - 1];
+    if (!isBounceAwayFromCorner(finalBounce)) {
+      continue;
+    }
+
+    const entryProgress = getZoneEntryProgress(
+      segmentStart,
+      wallPoint,
+      success,
+      zone,
+    );
+
+    if (entryProgress === null) {
+      continue;
+    }
+
+    const pathPoints = physicalPath.points.slice(0, bounceNumber + 1);
+    const segmentLengths = pathPoints.slice(1).map((point, index) =>
+      getPixelDistance(
+        pathPoints[index],
+        point,
+        arenaWidth,
+        arenaHeight,
+      ),
+    );
+    const finalSegmentLength = segmentLengths.at(-1) ?? 0;
+    const totalLength = segmentLengths.reduce(
+      (sum, length) => sum + length,
+      0,
+    );
+    const distanceInsideOutcomeZone =
+      finalSegmentLength * (1 - entryProgress);
+    const brakingLeadInDistance = randomBetween(
+      BRAKING_LEAD_IN_MIN_PX,
+      BRAKING_LEAD_IN_MAX_PX,
+    );
+    const desiredBrakingDistance = Math.max(
+      MIN_TOTAL_BRAKING_DISTANCE_PX,
+      distanceInsideOutcomeZone + brakingLeadInDistance,
+    );
+    const brakingDistance = Math.min(
+      desiredBrakingDistance,
+      totalLength * MAX_BRAKING_PATH_FRACTION,
+    );
+    const brakingStartDistanceProgress =
+      1 - brakingDistance / totalLength;
+
+    candidates.push({
+      bounceNumber,
+      brakingStartDistanceProgress: Math.max(
+        BALL_ACCELERATION_DISTANCE + 0.05,
+        Math.min(0.97, brakingStartDistanceProgress),
+      ),
+    });
+  }
+
+  return candidates;
+}
+
 function createBounceTrajectory(
   success: boolean,
   zone: ArenaZoneGeometry,
-): BallPoint[] {
-  const frameCount = Math.round(BALL_FLIGHT_MS / 32);
-  const deltaSeconds = BALL_FLIGHT_MS / frameCount / 1_000;
-  const start: BallPoint = { x: 50, y: 74 };
+  arenaWidth: number,
+  arenaHeight: number,
+): PlannedBallTrajectory {
+  for (
+    let attempt = 0;
+    attempt < MAX_TRAJECTORY_ATTEMPTS;
+    attempt += 1
+  ) {
+    const initialAngleRadians = randomBetween(0, Math.PI * 2);
+    const initialVelocity = {
+      x: Math.cos(initialAngleRadians),
+      y: Math.sin(initialAngleRadians),
+    };
 
-  for (let attempt = 0; attempt < 1_200; attempt += 1) {
-    let x = start.x;
-    let y = start.y;
-    let velocityX =
-      (38 + Math.random() * 34) * (Math.random() > 0.5 ? 1 : -1);
-    let velocityY =
-      (30 + Math.random() * 30) * (Math.random() > 0.5 ? 1 : -1);
-    let bounceCount = 0;
-    const points: BallPoint[] = [{ ...start }];
-
-    for (let frame = 1; frame <= frameCount; frame += 1) {
-      x += velocityX * deltaSeconds;
-      y += velocityY * deltaSeconds;
-
-      if (x < 4) {
-        x = 8 - x;
-        velocityX = Math.abs(velocityX);
-        bounceCount += 1;
-      } else if (x > 96) {
-        x = 192 - x;
-        velocityX = -Math.abs(velocityX);
-        bounceCount += 1;
-      }
-
-      if (y < 8) {
-        y = 16 - y;
-        velocityY = Math.abs(velocityY);
-        bounceCount += 1;
-      } else if (y > 91) {
-        y = 182 - y;
-        velocityY = -Math.abs(velocityY);
-        bounceCount += 1;
-      }
-
-      points.push({ x, y });
-    }
-
-    const finish = points.at(-1) ?? start;
-    const finishDepth = zone.depth(finish);
-    const landedInSuccess = finishDepth > 5;
-    const landedInFailure = finishDepth < -5;
-
+    // Very shallow angles produce long, visually repetitive wall runs.
     if (
-      bounceCount === REQUIRED_WALL_BOUNCES &&
-      ((success && landedInSuccess) ||
-        (!success && landedInFailure))
+      Math.abs(initialVelocity.x) < 0.3 ||
+      Math.abs(initialVelocity.y) < 0.3
     ) {
-      return points;
+      continue;
     }
+
+    const physicalPath = createPhysicalBouncePath(
+      initialAngleRadians,
+      arenaWidth,
+      arenaHeight,
+    );
+    if (!physicalPath) {
+      continue;
+    }
+
+    const candidates = findLandingCandidates(
+      physicalPath,
+      success,
+      zone,
+      arenaWidth,
+      arenaHeight,
+    );
+
+    if (candidates.length === 0) {
+      continue;
+    }
+
+    const candidate =
+      candidates[Math.floor(Math.random() * candidates.length)];
+    return {
+      points: physicalPath.points.slice(
+        0,
+        candidate.bounceNumber + 1,
+      ),
+      brakingStartDistanceProgress:
+        candidate.brakingStartDistanceProgress,
+    };
   }
 
-  let safePoint = start;
-  let bestDepth = success ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
-  for (let x = 8; x <= 92; x += 4) {
-    for (let y = 10; y <= 90; y += 4) {
-      const point = { x, y };
-      const depth = zone.depth(point);
-      if (
-        (success && depth > bestDepth) ||
-        (!success && depth < bestDepth)
-      ) {
-        bestDepth = depth;
-        safePoint = point;
-      }
-    }
-  }
-
-  return [
-    start,
-    { x: 4, y: 48 },
-    { x: 38, y: 8 },
-    { x: 96, y: 34 },
-    { x: 64, y: 91 },
-    { x: 4, y: 66 },
-    safePoint,
-  ];
+  throw new Error(
+    "Не удалось заранее рассчитать физическую траекторию для выбранной зоны.",
+  );
 }
 
 export function UpgradePage() {
@@ -453,24 +836,67 @@ export function UpgradePage() {
     setError("");
   }
 
-  async function animateBall(success: boolean) {
+  async function animateBall(
+    trajectoryPlan: PlannedBallTrajectory,
+  ) {
     const ball = ballRef.current;
     if (!ball) return;
 
-    const trajectory = createBounceTrajectory(success, arenaZone);
+    const arena = ball.offsetParent as HTMLElement | null;
+    const arenaWidth = arena?.clientWidth ?? 100;
+    const arenaHeight = arena?.clientHeight ?? 100;
+    const trajectory = trajectoryPlan.points;
     const finalPoint = trajectory.at(-1) ?? { x: 50, y: 74 };
-    const animation = ball.animate(
-      trajectory.map((point, index) => ({
-        left: `${point.x}%`,
-        top: `${point.y}%`,
-        offset: index / (trajectory.length - 1),
-      })),
-      {
-        duration: BALL_FLIGHT_MS,
-        easing: "cubic-bezier(0.72, 0, 0.12, 1)",
-        fill: "forwards",
-      },
+    const sampledTrajectory = sampleTrajectory(
+      trajectory,
+      arenaWidth,
+      arenaHeight,
     );
+    const segmentLengths = sampledTrajectory.slice(1).map((point, index) => {
+      const previousPoint = sampledTrajectory[index];
+      const deltaX = ((point.x - previousPoint.x) / 100) * arenaWidth;
+      const deltaY = ((point.y - previousPoint.y) / 100) * arenaHeight;
+
+      return Math.hypot(deltaX, deltaY);
+    });
+    const totalLength = segmentLengths.reduce(
+      (sum, length) => sum + length,
+      0,
+    );
+    let travelledLength = 0;
+    const distanceOffsets = sampledTrajectory.map((_, index) => {
+      if (index > 0) {
+        travelledLength += segmentLengths[index - 1];
+      }
+
+      return totalLength > 0
+        ? travelledLength / totalLength
+        : index / Math.max(1, sampledTrajectory.length - 1);
+    });
+    const motionTiming = createMotionTiming(
+      distanceOffsets,
+      trajectoryPlan.brakingStartDistanceProgress,
+      totalLength,
+    );
+    const keyframes = sampledTrajectory.map((point, index) => ({
+      left: `${point.x}%`,
+      top: `${point.y}%`,
+      offset: motionTiming.offsets[index],
+      easing: "linear",
+    }));
+
+    keyframes.push({
+      left: `${finalPoint.x}%`,
+      top: `${finalPoint.y}%`,
+      offset: 1,
+      easing: "linear",
+    });
+
+    const animation = ball.animate(keyframes, {
+      duration: motionTiming.durationMs,
+      easing: "linear",
+      fill: "forwards",
+    });
 
     ballAnimationRef.current = animation;
     try {
@@ -518,8 +944,40 @@ export function UpgradePage() {
     setError("");
     setResult(null);
     setShowWinModal(false);
-    setPhase("rolling");
     setBallPoint({ x: 50, y: 74 });
+
+    const ball = ballRef.current;
+    const arena = ball?.offsetParent as HTMLElement | null;
+
+    if (!ball || !arena) {
+      setError("Не удалось определить размеры игрового поля.");
+      return;
+    }
+
+    let successTrajectoryPlan: PlannedBallTrajectory;
+    let failureTrajectoryPlan: PlannedBallTrajectory;
+
+    try {
+      // Both outcomes are prepared before the server transaction starts.
+      // The backend result only selects which precomputed path is played.
+      successTrajectoryPlan = createBounceTrajectory(
+        true,
+        arenaZone,
+        arena.clientWidth,
+        arena.clientHeight,
+      );
+      failureTrajectoryPlan = createBounceTrajectory(
+        false,
+        arenaZone,
+        arena.clientWidth,
+        arena.clientHeight,
+      );
+    } catch (trajectoryError) {
+      setError(getFriendlyError(trajectoryError));
+      return;
+    }
+
+    setPhase("rolling");
 
     try {
       const upgradeResult = await apiRequest<UpgradeResponse>(
@@ -538,7 +996,11 @@ export function UpgradePage() {
       );
 
       setResult(upgradeResult);
-      await animateBall(upgradeResult.success);
+      await animateBall(
+        upgradeResult.success
+          ? successTrajectoryPlan
+          : failureTrajectoryPlan,
+      );
       setPhase("settled");
       setInventory((currentInventory) => {
         const remainingItems = currentInventory.filter(

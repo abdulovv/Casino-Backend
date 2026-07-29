@@ -141,8 +141,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <LiveDropFeed />
-
       <div className={contentClassName}>{children}</div>
 
       {!isAuthPage && !isCasePlayPage && (

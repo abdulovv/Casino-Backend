@@ -30,15 +30,6 @@ export interface OpenCaseResponse {
   price: number;
 }
 
-export interface RecentDropResponse {
-  id: number;
-  itemId: number;
-  name: string;
-  imageUrl: string;
-  price: number;
-  openedAt: string;
-}
-
 export interface LoginResponse {
   token: string;
 }
